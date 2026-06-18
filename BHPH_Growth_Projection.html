@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BHPH Growth & Capital Requirements Projector</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #0f1f3d; --navy-mid: #162845; --navy-light: #1e3561;
+    --accent: #2e7de8; --accent-light: #4a90e2;
+    --green: #27ae60; --red: #e74c3c; --gold: #f39c12;
+    --sidebar-w: 320px; --font: 'Arial', sans-serif;
+  }
+  body { font-family: var(--font); background: #f0f2f5; color: #1a1a2e; min-height: 100vh; display: flex; flex-direction: column; }
+
+  header {
+    background: var(--navy); color: #fff; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4); position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }
+  header h1 span { color: #5ba3f5; }
+  .header-badge { background: var(--accent); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+
+  .app-body { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 53px); }
+
+  aside {
+    width: var(--sidebar-w); background: var(--navy); overflow-y: auto;
+    flex-shrink: 0; padding-bottom: 24px;
+  }
+  aside::-webkit-scrollbar { width: 5px; }
+  aside::-webkit-scrollbar-track { background: var(--navy); }
+  aside::-webkit-scrollbar-thumb { background: var(--navy-light); border-radius: 3px; }
+
+  .sidebar-section { border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .sidebar-section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; cursor: pointer; color: #fff; user-select: none;
+    background: var(--navy-mid); font-size: 11px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  .sidebar-section-header:hover { background: var(--navy-light); }
+  .sidebar-section-header .arrow { font-size: 10px; transition: transform 0.2s; color: #5ba3f5; }
+  .sidebar-section-header.collapsed .arrow { transform: rotate(-90deg); }
+  .sidebar-section-body { padding: 10px 14px 14px; }
+  .sidebar-section-body.hidden { display: none; }
+
+  .input-group { margin-bottom: 12px; }
+  .input-group label { display: block; font-size: 11px; color: #9bb5d8; margin-bottom: 4px; font-weight: 500; }
+  .input-row { display: flex; align-items: center; gap: 8px; }
+  .input-row input[type="range"] {
+    flex: 1; -webkit-appearance: none; height: 4px; background: var(--navy-light);
+    border-radius: 2px; outline: none; cursor: pointer;
+  }
+  .input-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; background: var(--accent-light);
+    border-radius: 50%; cursor: pointer; border: 2px solid #fff;
+    box-shadow: 0 0 4px rgba(74,144,226,0.5);
+  }
+  .input-row input[type="number"] {
+    width: 90px; background: var(--navy-light); border: 1px solid rgba(255,255,255,0.15);
+    color: #fff; padding: 4px 6px; border-radius: 4px; font-size: 12px;
+    text-align: right; outline: none; font-family: monospace;
+  }
+  .input-row input[type="number"]:focus { border-color: var(--accent-light); background: rgba(74,144,226,0.15); }
+
+  /* Balance Override */
+  .override-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .override-label { font-size: 11px; color: #9bb5d8; font-weight: 500; }
+  .add-override-btn {
+    padding: 3px 10px; font-size: 11px; background: var(--accent); color: #fff;
+    border: none; border-radius: 4px; cursor: pointer; font-weight: 600;
+  }
+  .add-override-btn:hover { background: var(--accent-light); }
+  .override-list { display: flex; flex-direction: column; gap: 6px; }
+  .override-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center; }
+  .override-row input[type="number"] {
+    width: 100%; background: var(--navy-light); border: 1px solid rgba(255,255,255,0.15);
+    color: #fff; padding: 5px 6px; border-radius: 4px; font-size: 12px;
+    text-align: right; outline: none; font-family: monospace;
+  }
+  .override-row input[type="number"]:focus { border-color: var(--accent-light); }
+  .remove-override-btn {
+    width: 22px; height: 22px; background: rgba(231,76,60,0.2);
+    border: 1px solid rgba(231,76,60,0.3); color: #e74c3c;
+    border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .remove-override-btn:hover { background: rgba(231,76,60,0.4); }
+  .override-cols { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-bottom: 4px; }
+  .override-col-label { font-size: 10px; color: #6b7a99; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .override-empty { font-size: 11px; color: #5a7099; font-style: italic; padding: 4px 0; }
+  .override-hint { font-size: 10px; color: #5a7099; margin-top: 6px; line-height: 1.4; }
+
+  .reset-btn {
+    width: calc(100% - 28px); margin: 12px 14px 0; padding: 9px;
+    background: transparent; border: 1px solid rgba(255,255,255,0.2);
+    color: #9bb5d8; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
+    transition: all 0.2s;
+  }
+  .reset-btn:hover { background: var(--navy-light); color: #fff; border-color: var(--accent); }
+  .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 14px; }
+
+  main { flex: 1; overflow-y: auto; padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+  main::-webkit-scrollbar { width: 6px; }
+  main::-webkit-scrollbar-track { background: #e8eaf0; }
+  main::-webkit-scrollbar-thumb { background: #c0c8d8; border-radius: 3px; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .kpi-card {
+    background: #fff; border-radius: 10px; padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-left: 4px solid var(--accent);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .kpi-card.danger { border-color: var(--red); }
+  .kpi-card.success { border-color: var(--green); }
+  .kpi-card.warning { border-color: var(--gold); }
+  .kpi-card.neutral { border-color: #8e9ec2; }
+  .kpi-label { font-size: 10px; color: #6b7a99; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+  .kpi-value { font-size: 22px; font-weight: 700; color: #0f1f3d; line-height: 1.1; }
+  .kpi-sub { font-size: 11px; color: #8e9ec2; }
+
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .chart-card { background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .chart-title { font-size: 12px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .chart-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .chart-title .dot.green { background: var(--green); }
+  .chart-title .dot.red { background: var(--red); }
+  .chart-title .dot.gold { background: var(--gold); }
+  .chart-wrapper { position: relative; height: 200px; }
+
+  .table-card { background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .table-title { font-size: 12px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: 0.5px; }
+  .table-wrap { overflow-x: auto; max-height: 320px; overflow-y: auto; }
+  .table-wrap::-webkit-scrollbar { height: 4px; width: 4px; }
+  .table-wrap::-webkit-scrollbar-thumb { background: #c0c8d8; border-radius: 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  thead tr { background: var(--navy); color: #fff; position: sticky; top: 0; z-index: 1; }
+  thead th { padding: 8px 10px; text-align: right; font-weight: 600; font-size: 10px; letter-spacing: 0.3px; white-space: nowrap; }
+  thead th:first-child { text-align: center; }
+  tbody tr { border-bottom: 1px solid #f0f2f5; transition: background 0.1s; }
+  tbody tr:hover { background: #f5f7ff; }
+  tbody tr.open-month { background: #fff8e8; }
+  tbody tr.open-month:hover { background: #fef3d0; }
+  tbody tr.override-month { background: #f0f8ff; }
+  tbody tr.override-month:hover { background: #daeeff; }
+  tbody td { padding: 6px 10px; text-align: right; color: #2d3748; white-space: nowrap; }
+  tbody td:first-child { text-align: center; font-weight: 700; color: var(--navy); }
+  .neg { color: var(--red); font-weight: 600; }
+  .pos { color: var(--green); font-weight: 600; }
+  .store-badge { display: inline-block; background: #fff3e0; color: #e67e22; border-radius: 3px; padding: 1px 5px; font-size: 10px; font-weight: 700; margin-left: 4px; }
+  .bal-badge { display: inline-block; background: #e3f0ff; color: #2e7de8; border-radius: 3px; padding: 1px 5px; font-size: 10px; font-weight: 700; margin-left: 4px; }
+
+  .legend-row { display: flex; gap: 14px; font-size: 11px; color: #6b7a99; align-items: center; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .view-toggle { display: flex; gap: 4px; }
+  .view-btn { padding: 4px 10px; font-size: 11px; border: 1px solid #d0d8e8; background: #fff; color: #6b7a99; border-radius: 4px; cursor: pointer; font-weight: 600; }
+  .view-btn.active { background: var(--navy); color: #fff; border-color: var(--navy); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>BHPH <span>Growth & Capital Requirements</span> Projector</h1>
+  <div class="header-badge">60-Month Forecast</div>
+</header>
+
+<div class="app-body">
+
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<aside>
+
+  <!-- Portfolio Starting State -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-header" onclick="toggleSection(this)">
+      <span>📊 Portfolio — Starting State</span><span class="arrow">▼</span>
+    </div>
+    <div class="sidebar-section-body">
+      <div class="input-group">
+        <label>Starting Store Count</label>
+        <div class="input-row">
+          <input type="range" id="s_stores" min="5" max="50" step="1" value="17" oninput="syncInput('stores',this.value);recalc()">
+          <input type="number" id="n_stores" value="17" min="5" max="50" step="1" oninput="syncRange('stores',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Starting Portfolio AR ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_initAR" min="50000000" max="500000000" step="1000000" value="189000000" oninput="syncInput('initAR',this.value);recalc()">
+          <input type="number" id="n_initAR" value="189000000" oninput="syncRange('initAR',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Starting # of Accounts</label>
+        <div class="input-row">
+          <input type="range" id="s_initAccounts" min="1000" max="40000" step="100" value="14721" oninput="syncInput('initAccounts',this.value);recalc()">
+          <input type="number" id="n_initAccounts" value="14721" oninput="syncRange('initAccounts',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Starting Avg Account Balance ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_initBalance" min="3000" max="25000" step="50" value="12800" oninput="syncInput('initBalance',this.value);recalc()">
+          <input type="number" id="n_initBalance" value="12800" oninput="syncRange('initBalance',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Monthly Balance Decline ($/mo)</label>
+        <div class="input-row">
+          <input type="range" id="s_balDecline" min="0" max="250" step="5" value="50" oninput="syncInput('balDecline',this.value);recalc()">
+          <input type="number" id="n_balDecline" value="50" oninput="syncRange('balDecline',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Steady-State Balance Floor ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_balFloor" min="3000" max="20000" step="100" value="12000" oninput="syncInput('balFloor',this.value);recalc()">
+          <input type="number" id="n_balFloor" value="12000" oninput="syncRange('balFloor',this.value);recalc()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOC / Debt Parameters -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-header" onclick="toggleSection(this)">
+      <span>🏦 Line of Credit (LOC)</span><span class="arrow">▼</span>
+    </div>
+    <div class="sidebar-section-body">
+      <div class="input-group">
+        <label>Initial LOC Balance / Starting Debt ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_initLOC" min="0" max="25000000" step="100000" value="6500000" oninput="syncInput('initLOC',this.value);recalc()">
+          <input type="number" id="n_initLOC" value="6500000" oninput="syncRange('initLOC',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Annual LOC Interest Rate (%)</label>
+        <div class="input-row">
+          <input type="range" id="s_locRate" min="0" max="25" step="0.25" value="7.0" oninput="syncInput('locRate',this.value);recalc()">
+          <input type="number" id="n_locRate" value="7.0" step="0.25" oninput="syncRange('locRate',this.value);recalc()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Avg Balance Overrides -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-header" onclick="toggleSection(this)">
+      <span>📐 Avg Balance — Monthly Overrides</span><span class="arrow">▼</span>
+    </div>
+    <div class="sidebar-section-body">
+      <div class="override-header">
+        <span class="override-label">Set a specific Avg Balance at any month</span>
+        <button class="add-override-btn" onclick="addOverride()">+ Add</button>
+      </div>
+      <div class="override-cols">
+        <div class="override-col-label">Month</div>
+        <div class="override-col-label">Avg Balance ($)</div>
+        <div></div>
+      </div>
+      <div class="override-list" id="overrideList">
+        <div class="override-empty" id="overrideEmpty">No overrides — balance follows decline curve</div>
+      </div>
+      <div class="override-hint">At the specified month the balance is set to the override value and continues declining from there (respecting the floor).</div>
+    </div>
+  </div>
+
+  <!-- Sales & Inventory -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-header" onclick="toggleSection(this)">
+      <span>🚗 Sales &amp; Inventory</span><span class="arrow">▼</span>
+    </div>
+    <div class="sidebar-section-body">
+      <div class="input-group">
+        <label>Units Sold per Location per Month</label>
+        <div class="input-row">
+          <input type="range" id="s_salesPerLoc" min="10" max="150" step="0.5" value="50.6" oninput="syncInput('salesPerLoc',this.value);recalc()">
+          <input type="number" id="n_salesPerLoc" value="50.6" step="0.5" oninput="syncRange('salesPerLoc',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Avg Down Payment ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_downPmt" min="250" max="5000" step="50" value="1250" oninput="syncInput('downPmt',this.value);recalc()">
+          <input type="number" id="n_downPmt" value="1250" oninput="syncRange('downPmt',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Avg Amount Financed per Unit ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_amtFinanced" min="3000" max="35000" step="500" value="16000" oninput="syncInput('amtFinanced',this.value);recalc()">
+          <input type="number" id="n_amtFinanced" value="16000" oninput="syncRange('amtFinanced',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Avg Inventory ACV ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_acv" min="3000" max="25000" step="250" value="9500" oninput="syncInput('acv',this.value);recalc()">
+          <input type="number" id="n_acv" value="9500" oninput="syncRange('acv',this.value);recalc()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collection & Loss Rates -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-header" onclick="toggleSection(this)">
+      <span>📈 Collection &amp; Loss Rates</span><span class="arrow">▼</span>
+    </div>
+    <div class="sidebar-section-body">
+      <div class="input-group">
+        <label>Monthly Charge-Off Rate (% of accounts)</label>
+        <div class="input-row">
+          <input type="range" id="s_coRate" min="0.5" max="10" step="0.05" value="4.0" oninput="syncInput('coRate',this.value);recalc()">
+          <input type="number" id="n_coRate" value="4.0" step="0.05" oninput="syncRange('coRate',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Monthly Paid-Off Rate (% of accounts)</label>
+        <div class="input-row">
+          <input type="range" id="s_poRate" min="0.05" max="3" step="0.05" value="0.31" oninput="syncInput('poRate',this.value);recalc()">
+          <input type="number" id="n_poRate" value="0.31" step="0.05" oninput="syncRange('poRate',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Principal Collected (% of AR / month)</label>
+        <div class="input-row">
+          <input type="range" id="s_prinRate" min="0.5" max="12" step="0.1" value="4.0" oninput="syncInput('prinRate',this.value);recalc()">
+          <input type="number" id="n_prinRate" value="4.0" step="0.1" oninput="syncRange('prinRate',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Interest Rate (% of AR / month)</label>
+        <div class="input-row">
+          <input type="range" id="s_intRate" min="0.5" max="5" step="0.05" value="1.81" oninput="syncInput('intRate',this.value);recalc()">
+          <input type="number" id="n_intRate" value="1.81" step="0.05" oninput="syncRange('intRate',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Avg Net Loss per Charge-Off ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_netLoss" min="1000" max="20000" step="100" value="8596" oninput="syncInput('netLoss',this.value);recalc()">
+          <input type="number" id="n_netLoss" value="8596" oninput="syncRange('netLoss',this.value);recalc()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Growth Schedule -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-header" onclick="toggleSection(this)">
+      <span>🏪 Growth Schedule</span><span class="arrow">▼</span>
+    </div>
+    <div class="sidebar-section-body">
+      <div class="input-group">
+        <label>New Sales Lot Every N Months</label>
+        <div class="input-row">
+          <input type="range" id="s_growthInterval" min="2" max="18" step="1" value="4" oninput="syncInput('growthInterval',this.value);recalc()">
+          <input type="number" id="n_growthInterval" value="4" oninput="syncRange('growthInterval',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>First New Lot Opens at Month</label>
+        <div class="input-row">
+          <input type="range" id="s_startGrowth" min="1" max="12" step="1" value="3" oninput="syncInput('startGrowth',this.value);recalc()">
+          <input type="number" id="n_startGrowth" value="3" oninput="syncRange('startGrowth',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Add Recon + Service Lot Every Nth New Store</label>
+        <div class="input-row">
+          <input type="range" id="s_reconCycle" min="1" max="8" step="1" value="4" oninput="syncInput('reconCycle',this.value);recalc()">
+          <input type="number" id="n_reconCycle" value="4" oninput="syncRange('reconCycle',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Blended Tax Rate (%)</label>
+        <div class="input-row">
+          <input type="range" id="s_taxRate" min="0" max="20" step="0.25" value="7.5" oninput="syncInput('taxRate',this.value);recalc()">
+          <input type="number" id="n_taxRate" value="7.5" step="0.25" oninput="syncRange('taxRate',this.value);recalc()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Operating Costs (collapsed) -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-header collapsed" onclick="toggleSection(this)">
+      <span>💼 Operating Costs</span><span class="arrow">▼</span>
+    </div>
+    <div class="sidebar-section-body hidden">
+      <div class="input-group">
+        <label>Base Monthly OpEx ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_baseOpex" min="500000" max="15000000" step="50000" value="3250000" oninput="syncInput('baseOpex',this.value);recalc()">
+          <input type="number" id="n_baseOpex" value="3250000" oninput="syncRange('baseOpex',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>New Sales Lot Monthly OpEx ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_opexSales" min="10000" max="300000" step="5000" value="60000" oninput="syncInput('opexSales',this.value);recalc()">
+          <input type="number" id="n_opexSales" value="60000" oninput="syncRange('opexSales',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>New Recon Lot Monthly OpEx ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_opexRecon" min="25000" max="500000" step="5000" value="125000" oninput="syncInput('opexRecon',this.value);recalc()">
+          <input type="number" id="n_opexRecon" value="125000" oninput="syncRange('opexRecon',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>New Service Lot Monthly OpEx ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_opexService" min="10000" max="300000" step="5000" value="75000" oninput="syncInput('opexService',this.value);recalc()">
+          <input type="number" id="n_opexService" value="75000" oninput="syncRange('opexService',this.value);recalc()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CapEx & Real Estate (collapsed) -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-header collapsed" onclick="toggleSection(this)">
+      <span>🏗️ CapEx &amp; Real Estate</span><span class="arrow">▼</span>
+    </div>
+    <div class="sidebar-section-body hidden">
+      <div class="input-group">
+        <label>Maintenance CapEx per Store / Month ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_capexPerStore" min="100" max="5000" step="50" value="500" oninput="syncInput('capexPerStore',this.value);recalc()">
+          <input type="number" id="n_capexPerStore" value="500" oninput="syncRange('capexPerStore',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>New Sales Lot CapEx (one-time, $)</label>
+        <div class="input-row">
+          <input type="range" id="s_capexSales" min="10000" max="500000" step="5000" value="50000" oninput="syncInput('capexSales',this.value);recalc()">
+          <input type="number" id="n_capexSales" value="50000" oninput="syncRange('capexSales',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>New Recon Lot CapEx (one-time, $)</label>
+        <div class="input-row">
+          <input type="range" id="s_capexRecon" min="25000" max="1000000" step="5000" value="100000" oninput="syncInput('capexRecon',this.value);recalc()">
+          <input type="number" id="n_capexRecon" value="100000" oninput="syncRange('capexRecon',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>New Service Lot CapEx (one-time, $)</label>
+        <div class="input-row">
+          <input type="range" id="s_capexService" min="10000" max="500000" step="5000" value="75000" oninput="syncInput('capexService',this.value);recalc()">
+          <input type="number" id="n_capexService" value="75000" oninput="syncRange('capexService',this.value);recalc()">
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="input-group">
+        <label>Land / RE Cost — Sales Lot ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_landSales" min="0" max="5000000" step="50000" value="1000000" oninput="syncInput('landSales',this.value);recalc()">
+          <input type="number" id="n_landSales" value="1000000" oninput="syncRange('landSales',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Land / RE Cost — Recon Lot ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_landRecon" min="0" max="8000000" step="50000" value="1250000" oninput="syncInput('landRecon',this.value);recalc()">
+          <input type="number" id="n_landRecon" value="1250000" oninput="syncRange('landRecon',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Land / RE Cost — Service Lot ($)</label>
+        <div class="input-row">
+          <input type="range" id="s_landService" min="0" max="5000000" step="50000" value="800000" oninput="syncInput('landService',this.value);recalc()">
+          <input type="number" id="n_landService" value="800000" oninput="syncRange('landService',this.value);recalc()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="reset-btn" onclick="resetDefaults()">↺ Reset to Baseline Defaults</button>
+
+</aside>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<main>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-row">
+    <div class="kpi-card danger">
+      <div class="kpi-label">Peak Debt Balance</div>
+      <div class="kpi-value" id="kpi_peak">—</div>
+      <div class="kpi-sub" id="kpi_peak_mo">at Month —</div>
+    </div>
+    <div class="kpi-card warning">
+      <div class="kpi-label">Capital Deficit at Peak</div>
+      <div class="kpi-value" id="kpi_capdef">—</div>
+      <div class="kpi-sub">Beyond initial LOC</div>
+    </div>
+    <div class="kpi-card success">
+      <div class="kpi-label">Capital Breakeven Month</div>
+      <div class="kpi-value" id="kpi_breakeven">—</div>
+      <div class="kpi-sub">Debt returns to initial LOC</div>
+    </div>
+    <div class="kpi-card neutral">
+      <div class="kpi-label">Year-5 Portfolio AR</div>
+      <div class="kpi-value" id="kpi_ar60">—</div>
+      <div class="kpi-sub" id="kpi_ar60_stores">at — stores</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Year-5 Annual Net CF</div>
+      <div class="kpi-value" id="kpi_ncf">—</div>
+      <div class="kpi-sub">Months 49–60 sum</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot"></span>Portfolio AR Growth</div>
+      <div class="chart-wrapper"><canvas id="chartAR"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot red"></span>Monthly Cash Flow (after LOC interest)</div>
+      <div class="chart-wrapper"><canvas id="chartCF"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot red"></span>Debt Balance &amp; Capital Required</div>
+      <div class="chart-wrapper"><canvas id="chartCap"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot gold"></span>Avg Account Balance &amp; Store Count</div>
+      <div class="chart-wrapper"><canvas id="chartBal"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">Monthly Projection Detail</div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div class="legend-row">
+          <div class="legend-item"><div class="legend-dot" style="background:#fff3e0;border:1px solid #e67e22;border-radius:2px;width:12px;height:12px;"></div>&nbsp;New Location</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#e3f0ff;border:1px solid #2e7de8;border-radius:2px;width:12px;height:12px;"></div>&nbsp;Bal Override</div>
+        </div>
+        <div class="view-toggle">
+          <button class="view-btn active" onclick="setView('all',this)">All 60</button>
+          <button class="view-btn" onclick="setView('annual',this)">Annual</button>
+        </div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Mo</th>
+            <th>Stores</th>
+            <th>Sales</th>
+            <th>Accounts</th>
+            <th>Avg Bal</th>
+            <th>Portfolio AR</th>
+            <th>Down Pmts</th>
+            <th>Principal</th>
+            <th>Interest</th>
+            <th>Inventory</th>
+            <th>Sales Tax</th>
+            <th>LOC Int Exp</th>
+            <th>CapEx</th>
+            <th>OpEx</th>
+            <th>Land / RE</th>
+            <th>Monthly CF</th>
+            <th>Debt Balance</th>
+            <th>Capital Req'd</th>
+          </tr>
+        </thead>
+        <tbody id="projTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  OVERRIDE MANAGEMENT
+// ═══════════════════════════════════════════════════════
+let overrideIdCounter = 0;
+
+function addOverride(month, balance) {
+  const list = document.getElementById('overrideList');
+  const empty = document.getElementById('overrideEmpty');
+  if (empty) empty.style.display = 'none';
+
+  const id = ++overrideIdCounter;
+  const row = document.createElement('div');
+  row.className = 'override-row';
+  row.id = 'override_' + id;
+  row.innerHTML = `
+    <input type="number" min="1" max="60" step="1" value="${month || ''}" placeholder="1–60"
+      oninput="recalc()" title="Projection month">
+    <input type="number" min="1000" max="50000" step="100" value="${balance || ''}" placeholder="$"
+      oninput="recalc()" title="Avg Account Balance ($)">
+    <button class="remove-override-btn" onclick="removeOverride(${id})" title="Remove">×</button>
+  `;
+  list.appendChild(row);
+  recalc();
+}
+
+function removeOverride(id) {
+  const row = document.getElementById('override_' + id);
+  if (row) row.remove();
+  const list = document.getElementById('overrideList');
+  if (list.querySelectorAll('.override-row').length === 0) {
+    document.getElementById('overrideEmpty').style.display = '';
+  }
+  recalc();
+}
+
+function getOverrides() {
+  const overrides = {};
+  document.querySelectorAll('#overrideList .override-row').forEach(row => {
+    const inputs = row.querySelectorAll('input[type="number"]');
+    const mo  = parseInt(inputs[0].value);
+    const bal = parseFloat(inputs[1].value);
+    if (mo >= 1 && mo <= 60 && bal > 0) overrides[mo] = bal;
+  });
+  return overrides;
+}
+
+// ═══════════════════════════════════════════════════════
+//  MODEL
+// ═══════════════════════════════════════════════════════
+function getParams() {
+  const g = id => parseFloat(document.getElementById('n_' + id).value) || 0;
+  return {
+    stores:        g('stores'),
+    initAR:        g('initAR'),
+    initAccounts:  g('initAccounts'),
+    initBalance:   g('initBalance'),
+    balDecline:    g('balDecline'),
+    balFloor:      g('balFloor'),
+    initLOC:       g('initLOC'),
+    locRate:       g('locRate') / 100,
+    salesPerLoc:   g('salesPerLoc'),
+    downPmt:       g('downPmt'),
+    amtFinanced:   g('amtFinanced'),
+    acv:           g('acv'),
+    coRate:        g('coRate') / 100,
+    poRate:        g('poRate') / 100,
+    prinRate:      g('prinRate') / 100,
+    intRate:       g('intRate') / 100,
+    netLoss:       g('netLoss'),
+    growthInterval:g('growthInterval'),
+    startGrowth:   g('startGrowth'),
+    reconCycle:    g('reconCycle'),
+    taxRate:       g('taxRate') / 100,
+    baseOpex:      g('baseOpex'),
+    opexSales:     g('opexSales'),
+    opexRecon:     g('opexRecon'),
+    opexService:   g('opexService'),
+    capexPerStore: g('capexPerStore'),
+    capexSales:    g('capexSales'),
+    capexRecon:    g('capexRecon'),
+    capexService:  g('capexService'),
+    landSales:     g('landSales'),
+    landRecon:     g('landRecon'),
+    landService:   g('landService'),
+  };
+}
+
+function runModel(p, balOverrides) {
+  const VARIANCE_RATE = 0.0009;
+  const results = [];
+
+  let accounts   = p.initAccounts;
+  let avgBalance = p.initBalance;
+  let ar         = p.initAR;
+  let storeCount = p.stores;
+  let opex       = p.baseOpex;
+  let newStores  = 0;
+  let debtBalance = p.initLOC;  // tracks outstanding LOC balance
+
+  for (let m = 1; m <= 60; m++) {
+    // ── Store openings ──
+    let locCapex = 0, landCost = 0;
+    let newSalesLot = 0, newReconLot = 0, newServiceLot = 0;
+    if (m >= p.startGrowth && (m - p.startGrowth) % p.growthInterval === 0) {
+      newStores++;
+      newSalesLot = 1;
+      storeCount++;
+      locCapex += p.capexSales;
+      landCost += p.landSales;
+      opex     += p.opexSales;
+      if (newStores % p.reconCycle === 0) {
+        newReconLot = 1; newServiceLot = 1;
+        locCapex += p.capexRecon + p.capexService;
+        landCost += p.landRecon  + p.landService;
+        opex     += p.opexRecon  + p.opexService;
+      }
+    }
+
+    // ── LOC interest expense (on prior month balance) ──
+    const interestExp = debtBalance * (p.locRate / 12);
+
+    // ── Sales & accounts ──
+    const salesUnits = storeCount * p.salesPerLoc;
+    const coCount    = Math.round(accounts * p.coRate);
+    const poCount    = Math.round(accounts * p.poRate);
+    accounts = accounts + salesUnits - coCount - poCount;
+
+    // ── Avg balance: override or decline ──
+    let isOverride = false;
+    if (balOverrides[m] !== undefined) {
+      avgBalance = balOverrides[m];
+      isOverride = true;
+    } else {
+      avgBalance = Math.max(avgBalance - p.balDecline, p.balFloor);
+    }
+
+    // ── Portfolio AR ──
+    const prevAR = ar;
+    ar = accounts * avgBalance;
+
+    // ── Cash flows ──
+    const downPmtCash   = salesUnits * p.downPmt;
+    const principal     = prevAR * p.prinRate;
+    const interest      = ar * p.intRate;
+    const inventoryBuys = salesUnits * p.acv;
+    const salesTax      = ar * 0.00297 * (p.taxRate / 0.075);
+    const capex         = storeCount * p.capexPerStore + locCapex;
+    const chargeOff     = coCount * p.netLoss; // informational
+
+    // Cash flow now includes LOC interest expense as a deduction
+    const cashFlow = downPmtCash + principal + interest
+                   - inventoryBuys - salesTax - capex - opex - landCost
+                   - interestExp;
+
+    // ── Debt balance & capital required ──
+    const variance = -ar * VARIANCE_RATE;
+    debtBalance = debtBalance - cashFlow - variance;
+    const capitalRequired = p.initLOC - debtBalance; // negative = capital deficit beyond initial LOC
+
+    results.push({
+      month: m, storeCount,
+      salesUnits: Math.round(salesUnits),
+      accounts:   Math.round(accounts),
+      avgBalance: Math.round(avgBalance),
+      portfolioAR: ar,
+      coCount, poCount, chargeOff,
+      downPmtCash, principal, interest,
+      inventoryBuys, salesTax, interestExp,
+      capex, opex, landCost,
+      cashFlow, variance, debtBalance, capitalRequired,
+      hasNewLot: newSalesLot + newReconLot > 0,
+      newReconLot, newSalesLot, isOverride,
+    });
+  }
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════
+//  CHARTS
+// ═══════════════════════════════════════════════════════
+let chartAR, chartCF, chartCap, chartBal;
+
+function initCharts() {
+  Chart.defaults.font.family = 'Arial, sans-serif';
+  Chart.defaults.font.size   = 11;
+  const labels = Array.from({length: 60}, (_, i) => `M${i+1}`);
+
+  chartAR = new Chart(document.getElementById('chartAR'), {
+    type: 'line',
+    data: { labels, datasets: [{ label: 'Portfolio AR', data: [],
+      borderColor: '#2e7de8', backgroundColor: 'rgba(46,125,232,0.08)',
+      borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' $' + fmtM(ctx.raw) }}},
+      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 12, color: '#8e9ec2' }},
+                y: { grid: { color: '#f0f2f5' }, ticks: { color: '#8e9ec2', callback: v => '$' + fmtM(v) }}}}
+  });
+
+  chartCF = new Chart(document.getElementById('chartCF'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Monthly CF', data: [],
+      backgroundColor: [], borderRadius: 2 }]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' $' + fmtK(ctx.raw) }}},
+      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 12, color: '#8e9ec2' }},
+                y: { grid: { color: '#f0f2f5' }, ticks: { color: '#8e9ec2', callback: v => '$' + fmtK(v) }}}}
+  });
+
+  chartCap = new Chart(document.getElementById('chartCap'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Debt Balance', data: [],
+        borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.08)',
+        borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3, yAxisID: 'y' },
+      { label: 'Capital Required', data: [],
+        borderColor: '#8e9ec2', backgroundColor: 'transparent',
+        borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.3,
+        borderDash: [4, 3], yAxisID: 'y' },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'top', labels: { boxWidth: 10, padding: 10, font: { size: 11 }}},
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: $${fmtK(ctx.raw)}` }}
+      },
+      scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 12, color: '#8e9ec2' }},
+                y: { grid: { color: '#f0f2f5' }, ticks: { color: '#8e9ec2', callback: v => '$' + fmtM(v) }}}}
+  });
+
+  chartBal = new Chart(document.getElementById('chartBal'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label: 'Avg Account Balance ($)', data: [], borderColor: '#2e7de8',
+        backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, yAxisID: 'y1', tension: 0.1 },
+      { label: 'Store Count', data: [], borderColor: '#e67e22',
+        backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 0, yAxisID: 'y2',
+        borderDash: [4, 3], tension: 0.1 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 10, padding: 10, font: { size: 11 }}},
+        tooltip: { callbacks: { label: ctx => ctx.datasetIndex === 0
+          ? ` $${ctx.raw.toLocaleString()} avg bal` : ` ${ctx.raw} stores` }}},
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 12, color: '#8e9ec2' }},
+        y1: { position: 'left', grid: { color: '#f0f2f5' }, ticks: { color: '#2e7de8', callback: v => '$' + v.toLocaleString() },
+          title: { display: true, text: 'Avg Balance', color: '#2e7de8', font: { size: 10 }}},
+        y2: { position: 'right', grid: { display: false }, ticks: { color: '#e67e22' },
+          title: { display: true, text: 'Stores', color: '#e67e22', font: { size: 10 }}},
+      }
+    }
+  });
+}
+
+function updateCharts(data) {
+  chartAR.data.datasets[0].data = data.map(r => r.portfolioAR);
+  chartAR.update('none');
+
+  const cf = data.map(r => r.cashFlow);
+  chartCF.data.datasets[0].data = cf;
+  chartCF.data.datasets[0].backgroundColor = cf.map(v => v >= 0 ? 'rgba(39,174,96,0.7)' : 'rgba(231,76,60,0.7)');
+  chartCF.update('none');
+
+  chartCap.data.datasets[0].data = data.map(r => r.debtBalance);
+  chartCap.data.datasets[1].data = data.map(r => r.capitalRequired);
+  chartCap.update('none');
+
+  chartBal.data.datasets[0].data = data.map(r => r.avgBalance);
+  chartBal.data.datasets[1].data = data.map(r => r.storeCount);
+  chartBal.data.datasets[0].pointRadius      = data.map(r => r.isOverride ? 5 : 0);
+  chartBal.data.datasets[0].pointBackgroundColor = '#2e7de8';
+  chartBal.update('none');
+}
+
+// ═══════════════════════════════════════════════════════
+//  KPIs
+// ═══════════════════════════════════════════════════════
+function updateKPIs(data) {
+  const el = id => document.getElementById(id);
+  const initLOC = parseFloat(document.getElementById('n_initLOC').value) || 0;
+
+  // Peak debt balance
+  const debts    = data.map(r => r.debtBalance);
+  const maxDebt  = Math.max(...debts);
+  const peakMo   = debts.indexOf(maxDebt) + 1;
+  el('kpi_peak').textContent    = '$' + fmtM(maxDebt);
+  el('kpi_peak').style.color    = '#e74c3c';
+  el('kpi_peak_mo').textContent = `at Month ${peakMo}`;
+
+  // Capital deficit at peak
+  const maxDef = maxDebt - initLOC;
+  el('kpi_capdef').textContent = '$' + fmtM(maxDef);
+  el('kpi_capdef').style.color = maxDef > 0 ? '#e74c3c' : '#27ae60';
+
+  // Capital breakeven: first month where debtBalance ≤ initLOC
+  const bev = data.findIndex(r => r.debtBalance <= initLOC);
+  el('kpi_breakeven').textContent = bev >= 0 ? `Month ${bev + 1}` : 'Beyond 60 mo';
+  el('kpi_breakeven').style.color = bev >= 0 ? '#27ae60' : '#e74c3c';
+
+  // Y5 AR
+  const last = data[59];
+  el('kpi_ar60').textContent        = '$' + fmtM(last.portfolioAR);
+  el('kpi_ar60_stores').textContent = `at ${last.storeCount} stores`;
+
+  // Y5 net CF
+  const y5cf = data.slice(48).reduce((s, r) => s + r.cashFlow, 0);
+  el('kpi_ncf').textContent = (y5cf >= 0 ? '+' : '') + '$' + fmtM(y5cf);
+  el('kpi_ncf').style.color = y5cf >= 0 ? '#27ae60' : '#e74c3c';
+}
+
+// ═══════════════════════════════════════════════════════
+//  TABLE
+// ═══════════════════════════════════════════════════════
+let currentView = 'all';
+let lastData    = [];
+
+function setView(v, btn) {
+  currentView = v;
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable(lastData);
+}
+
+function renderTable(data) {
+  const rows = currentView === 'annual' ? data.filter(r => r.month % 12 === 0) : data;
+  const tbody = document.getElementById('projTable');
+  tbody.innerHTML = rows.map(r => {
+    const cfCls   = r.cashFlow        < 0 ? 'neg' : 'pos';
+    const capCls  = r.capitalRequired < 0 ? 'neg' : 'pos';
+    const lotBadge = r.newReconLot ? '<span class="store-badge">Recon+Svc+Sales</span>'
+                   : r.newSalesLot ? '<span class="store-badge">Sales</span>' : '';
+    const balBadge = r.isOverride  ? `<span class="bal-badge">Override</span>` : '';
+    const rowCls   = r.hasNewLot   ? 'open-month' : r.isOverride ? 'override-month' : '';
+    return `<tr class="${rowCls}">
+      <td>${r.month}</td>
+      <td>${r.storeCount}${lotBadge}</td>
+      <td>${r.salesUnits.toLocaleString()}</td>
+      <td>${r.accounts.toLocaleString()}</td>
+      <td>$${r.avgBalance.toLocaleString()}${balBadge}</td>
+      <td>$${fmtM(r.portfolioAR)}</td>
+      <td>$${fmtK(r.downPmtCash)}</td>
+      <td>$${fmtK(r.principal)}</td>
+      <td>$${fmtK(r.interest)}</td>
+      <td>($${fmtK(r.inventoryBuys)})</td>
+      <td>($${fmtK(r.salesTax)})</td>
+      <td>($${fmtK(r.interestExp)})</td>
+      <td>($${fmtK(r.capex)})</td>
+      <td>($${fmtK(r.opex)})</td>
+      <td>${r.landCost > 0 ? '($' + fmtK(r.landCost) + ')' : '—'}</td>
+      <td class="${cfCls}">${r.cashFlow >= 0 ? '+' : ''}$${fmtK(r.cashFlow)}</td>
+      <td>$${fmtM(r.debtBalance)}</td>
+      <td class="${capCls}">${r.capitalRequired >= 0 ? '+' : ''}$${fmtK(r.capitalRequired)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  RECALC
+// ═══════════════════════════════════════════════════════
+function recalc() {
+  const p    = getParams();
+  const ovr  = getOverrides();
+  const data = runModel(p, ovr);
+  lastData   = data;
+  updateCharts(data);
+  updateKPIs(data);
+  renderTable(data);
+}
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+function fmtM(v) {
+  const a = Math.abs(v), s = v < 0 ? '-' : '';
+  if (a >= 1e9) return s + (a/1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return s + (a/1e6).toFixed(1) + 'M';
+  return s + fmtK(Math.abs(v));
+}
+function fmtK(v) {
+  const a = Math.abs(v), s = v < 0 ? '-' : '';
+  if (a >= 1e6) return s + (a/1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return s + Math.round(a/1e3) + 'K';
+  return s + Math.round(a).toLocaleString();
+}
+
+function syncInput(key, val) { const n = document.getElementById('n_'+key); if(n) n.value = val; }
+function syncRange(key, val)  { const s = document.getElementById('s_'+key); if(s) s.value = val; }
+
+function toggleSection(header) {
+  header.classList.toggle('collapsed');
+  header.nextElementSibling.classList.toggle('hidden');
+}
+
+function resetDefaults() {
+  const D = {
+    stores:17, initAR:189000000, initAccounts:14721, initBalance:12800, balDecline:50, balFloor:12000,
+    initLOC:6500000, locRate:7.0,
+    salesPerLoc:50.6, downPmt:1250, amtFinanced:16000, acv:9500,
+    coRate:4.0, poRate:0.31, prinRate:4.0, intRate:1.81, netLoss:8596,
+    growthInterval:4, startGrowth:3, reconCycle:4, taxRate:7.5,
+    baseOpex:3250000, opexSales:60000, opexRecon:125000, opexService:75000,
+    capexPerStore:500, capexSales:50000, capexRecon:100000, capexService:75000,
+    landSales:1000000, landRecon:1250000, landService:800000,
+  };
+  Object.entries(D).forEach(([k, v]) => { syncInput(k, v); syncRange(k, v); });
+  document.querySelectorAll('#overrideList .override-row').forEach(r => r.remove());
+  document.getElementById('overrideEmpty').style.display = '';
+  recalc();
+}
+
+// ── INIT ──
+window.addEventListener('DOMContentLoaded', () => { initCharts(); recalc(); });
+</script>
+</body>
+</html>

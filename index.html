@@ -51,7 +51,7 @@
   .input-group label { display: block; font-size: 11px; color: #9bb5d8; margin-bottom: 4px; font-weight: 500; }
   .input-row { display: flex; align-items: center; gap: 8px; }
   .input-row input[type="range"] {
-    flex: 1; -webkit-appearance: none; height: 4px; background: var(--navy-light);
+    flex: 1; -webkit-appearance: none; appearance: none; height: 4px; background: var(--navy-light);
     border-radius: 2px; outline: none; cursor: pointer;
   }
   .input-row input[type="range"]::-webkit-slider-thumb {
@@ -331,7 +331,7 @@
       <div class="input-group">
         <label>Principal Collected (% of AR / month)</label>
         <div class="input-row">
-          <input type="range" id="s_prinRate" min="0.5" max="12" step="0.1" value="4.0" oninput="syncInput('prinRate',this.value);recalc()">
+          <input type="range" id="s_prinRate" min="0.5" max="12" step="0.1" value="3.8" oninput="syncInput('prinRate',this.value);recalc()">
           <input type="number" id="n_prinRate" value="4.0" step="0.1" oninput="syncRange('prinRate',this.value);recalc()">
         </div>
       </div>

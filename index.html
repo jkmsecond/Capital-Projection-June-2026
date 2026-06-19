@@ -51,7 +51,7 @@
   .input-group label { display: block; font-size: 11px; color: #9bb5d8; margin-bottom: 4px; font-weight: 500; }
   .input-row { display: flex; align-items: center; gap: 8px; }
   .input-row input[type="range"] {
-    flex: 1; -webkit-appearance: none; appearance: none; height: 4px; background: var(--navy-light);
+    flex: 1; -webkit-appearance: none; height: 4px; background: var(--navy-light);
     border-radius: 2px; outline: none; cursor: pointer;
   }
   .input-row input[type="range"]::-webkit-slider-thumb {
@@ -324,8 +324,8 @@
       <div class="input-group">
         <label>Monthly Paid-Off Rate (% of accounts)</label>
         <div class="input-row">
-          <input type="range" id="s_poRate" min="0.05" max="3" step="0.05" value="0.31" oninput="syncInput('poRate',this.value);recalc()">
-          <input type="number" id="n_poRate" value="0.31" step="0.05" oninput="syncRange('poRate',this.value);recalc()">
+          <input type="range" id="s_poRate" min="0.01" max="1" step="0.005" value="0.0325" oninput="syncInput('poRate',this.value);recalc()">
+          <input type="number" id="n_poRate" value="0.0325" step="0.005" oninput="syncRange('poRate',this.value);recalc()">
         </div>
       </div>
       <div class="input-group">
@@ -338,8 +338,15 @@
       <div class="input-group">
         <label>Interest Rate (% of AR / month)</label>
         <div class="input-row">
-          <input type="range" id="s_intRate" min="0.5" max="5" step="0.05" value="1.81" oninput="syncInput('intRate',this.value);recalc()">
-          <input type="number" id="n_intRate" value="1.81" step="0.05" oninput="syncRange('intRate',this.value);recalc()">
+          <input type="range" id="s_intRate" min="0.5" max="5" step="0.05" value="1.77" oninput="syncInput('intRate',this.value);recalc()">
+          <input type="number" id="n_intRate" value="1.77" step="0.05" oninput="syncRange('intRate',this.value);recalc()">
+        </div>
+      </div>
+      <div class="input-group">
+        <label>CPP / SC Premium Rate (% of AR / month)</label>
+        <div class="input-row">
+          <input type="range" id="s_cppRate" min="0" max="2" step="0.05" value="0.7" oninput="syncInput('cppRate',this.value);recalc()">
+          <input type="number" id="n_cppRate" value="0.7" step="0.05" oninput="syncRange('cppRate',this.value);recalc()">
         </div>
       </div>
       <div class="input-group">
@@ -398,8 +405,8 @@
       <div class="input-group">
         <label>Base Monthly OpEx ($)</label>
         <div class="input-row">
-          <input type="range" id="s_baseOpex" min="500000" max="15000000" step="50000" value="3250000" oninput="syncInput('baseOpex',this.value);recalc()">
-          <input type="number" id="n_baseOpex" value="3250000" oninput="syncRange('baseOpex',this.value);recalc()">
+          <input type="range" id="s_baseOpex" min="500000" max="15000000" step="50000" value="4250000" oninput="syncInput('baseOpex',this.value);recalc()">
+          <input type="number" id="n_baseOpex" value="4250000" oninput="syncRange('baseOpex',this.value);recalc()">
         </div>
       </div>
       <div class="input-group">
@@ -569,6 +576,7 @@
             <th>Down Pmts</th>
             <th>Principal</th>
             <th>Interest</th>
+            <th>CPP/SC</th>
             <th>Inventory</th>
             <th>Sales Tax</th>
             <th>LOC Int Exp</th>
@@ -595,19 +603,16 @@
 let overrideIdCounter = 0;
 
 function addOverride(month, balance) {
-  const list = document.getElementById('overrideList');
+  const list  = document.getElementById('overrideList');
   const empty = document.getElementById('overrideEmpty');
   if (empty) empty.style.display = 'none';
-
   const id = ++overrideIdCounter;
   const row = document.createElement('div');
   row.className = 'override-row';
   row.id = 'override_' + id;
   row.innerHTML = `
-    <input type="number" min="1" max="60" step="1" value="${month || ''}" placeholder="1–60"
-      oninput="recalc()" title="Projection month">
-    <input type="number" min="1000" max="50000" step="100" value="${balance || ''}" placeholder="$"
-      oninput="recalc()" title="Avg Account Balance ($)">
+    <input type="number" min="1" max="60" step="1" value="${month||''}" placeholder="1–60" oninput="recalc()" title="Projection month">
+    <input type="number" min="1000" max="50000" step="100" value="${balance||''}" placeholder="$" oninput="recalc()" title="Avg Account Balance ($)">
     <button class="remove-override-btn" onclick="removeOverride(${id})" title="Remove">×</button>
   `;
   list.appendChild(row);
@@ -618,21 +623,19 @@ function removeOverride(id) {
   const row = document.getElementById('override_' + id);
   if (row) row.remove();
   const list = document.getElementById('overrideList');
-  if (list.querySelectorAll('.override-row').length === 0) {
+  if (list.querySelectorAll('.override-row').length === 0)
     document.getElementById('overrideEmpty').style.display = '';
-  }
   recalc();
 }
 
 function getOverrides() {
-  const overrides = {};
+  const o = {};
   document.querySelectorAll('#overrideList .override-row').forEach(row => {
-    const inputs = row.querySelectorAll('input[type="number"]');
-    const mo  = parseInt(inputs[0].value);
-    const bal = parseFloat(inputs[1].value);
-    if (mo >= 1 && mo <= 60 && bal > 0) overrides[mo] = bal;
+    const [mEl, bEl] = row.querySelectorAll('input[type="number"]');
+    const mo = parseInt(mEl.value), bal = parseFloat(bEl.value);
+    if (mo >= 1 && mo <= 60 && bal > 0) o[mo] = bal;
   });
-  return overrides;
+  return o;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -657,6 +660,7 @@ function getParams() {
     poRate:        g('poRate') / 100,
     prinRate:      g('prinRate') / 100,
     intRate:       g('intRate') / 100,
+    cppRate:       g('cppRate') / 100,
     netLoss:       g('netLoss'),
     growthInterval:g('growthInterval'),
     startGrowth:   g('startGrowth'),
@@ -680,13 +684,13 @@ function runModel(p, balOverrides) {
   const VARIANCE_RATE = 0.0009;
   const results = [];
 
-  let accounts   = p.initAccounts;
-  let avgBalance = p.initBalance;
-  let ar         = p.initAR;
-  let storeCount = p.stores;
-  let opex       = p.baseOpex;
-  let newStores  = 0;
-  let debtBalance = p.initLOC;  // tracks outstanding LOC balance
+  let accounts    = p.initAccounts;
+  let avgBalance  = p.initBalance;
+  let ar          = p.initAR;
+  let storeCount  = p.stores;
+  let opex        = p.baseOpex;
+  let newStores   = 0;
+  let debtBalance = p.initLOC;
 
   for (let m = 1; m <= 60; m++) {
     // ── Store openings ──
@@ -710,10 +714,10 @@ function runModel(p, balOverrides) {
     // ── LOC interest expense (on prior month balance) ──
     const interestExp = debtBalance * (p.locRate / 12);
 
-    // ── Sales & accounts ──
+    // ── Sales & account attrition (floating point — not rounded) ──
     const salesUnits = storeCount * p.salesPerLoc;
-    const coCount    = Math.round(accounts * p.coRate);
-    const poCount    = Math.round(accounts * p.poRate);
+    const coCount    = accounts * p.coRate;
+    const poCount    = accounts * p.poRate;
     accounts = accounts + salesUnits - coCount - poCount;
 
     // ── Avg balance: override or decline ──
@@ -733,20 +737,20 @@ function runModel(p, balOverrides) {
     const downPmtCash   = salesUnits * p.downPmt;
     const principal     = prevAR * p.prinRate;
     const interest      = ar * p.intRate;
+    const cppSc         = ar * p.cppRate;                     // CPP / SC premium income
     const inventoryBuys = salesUnits * p.acv;
-    const salesTax      = ar * 0.00297 * (p.taxRate / 0.075);
+    const salesTax      = prevAR * p.prinRate * p.taxRate;    // prevAR × prinRate × taxRate
     const capex         = storeCount * p.capexPerStore + locCapex;
-    const chargeOff     = coCount * p.netLoss; // informational
+    const chargeOff     = coCount * p.netLoss;                // informational
 
-    // Cash flow now includes LOC interest expense as a deduction
-    const cashFlow = downPmtCash + principal + interest
+    const cashFlow = downPmtCash + principal + interest + cppSc
                    - inventoryBuys - salesTax - capex - opex - landCost
                    - interestExp;
 
     // ── Debt balance & capital required ──
     const variance = -ar * VARIANCE_RATE;
     debtBalance = debtBalance - cashFlow - variance;
-    const capitalRequired = p.initLOC - debtBalance; // negative = capital deficit beyond initial LOC
+    const capitalRequired = p.initLOC - debtBalance;
 
     results.push({
       month: m, storeCount,
@@ -755,7 +759,7 @@ function runModel(p, balOverrides) {
       avgBalance: Math.round(avgBalance),
       portfolioAR: ar,
       coCount, poCount, chargeOff,
-      downPmtCash, principal, interest,
+      downPmtCash, principal, interest, cppSc,
       inventoryBuys, salesTax, interestExp,
       capex, opex, landCost,
       cashFlow, variance, debtBalance, capitalRequired,
@@ -856,7 +860,7 @@ function updateCharts(data) {
 
   chartBal.data.datasets[0].data = data.map(r => r.avgBalance);
   chartBal.data.datasets[1].data = data.map(r => r.storeCount);
-  chartBal.data.datasets[0].pointRadius      = data.map(r => r.isOverride ? 5 : 0);
+  chartBal.data.datasets[0].pointRadius         = data.map(r => r.isOverride ? 5 : 0);
   chartBal.data.datasets[0].pointBackgroundColor = '#2e7de8';
   chartBal.update('none');
 }
@@ -865,33 +869,28 @@ function updateCharts(data) {
 //  KPIs
 // ═══════════════════════════════════════════════════════
 function updateKPIs(data) {
-  const el = id => document.getElementById(id);
+  const el     = id => document.getElementById(id);
   const initLOC = parseFloat(document.getElementById('n_initLOC').value) || 0;
 
-  // Peak debt balance
-  const debts    = data.map(r => r.debtBalance);
-  const maxDebt  = Math.max(...debts);
-  const peakMo   = debts.indexOf(maxDebt) + 1;
+  const debts   = data.map(r => r.debtBalance);
+  const maxDebt = Math.max(...debts);
+  const peakMo  = debts.indexOf(maxDebt) + 1;
   el('kpi_peak').textContent    = '$' + fmtM(maxDebt);
   el('kpi_peak').style.color    = '#e74c3c';
   el('kpi_peak_mo').textContent = `at Month ${peakMo}`;
 
-  // Capital deficit at peak
   const maxDef = maxDebt - initLOC;
   el('kpi_capdef').textContent = '$' + fmtM(maxDef);
   el('kpi_capdef').style.color = maxDef > 0 ? '#e74c3c' : '#27ae60';
 
-  // Capital breakeven: first month where debtBalance ≤ initLOC
   const bev = data.findIndex(r => r.debtBalance <= initLOC);
   el('kpi_breakeven').textContent = bev >= 0 ? `Month ${bev + 1}` : 'Beyond 60 mo';
   el('kpi_breakeven').style.color = bev >= 0 ? '#27ae60' : '#e74c3c';
 
-  // Y5 AR
   const last = data[59];
   el('kpi_ar60').textContent        = '$' + fmtM(last.portfolioAR);
   el('kpi_ar60_stores').textContent = `at ${last.storeCount} stores`;
 
-  // Y5 net CF
   const y5cf = data.slice(48).reduce((s, r) => s + r.cashFlow, 0);
   el('kpi_ncf').textContent = (y5cf >= 0 ? '+' : '') + '$' + fmtM(y5cf);
   el('kpi_ncf').style.color = y5cf >= 0 ? '#27ae60' : '#e74c3c';
@@ -911,11 +910,11 @@ function setView(v, btn) {
 }
 
 function renderTable(data) {
-  const rows = currentView === 'annual' ? data.filter(r => r.month % 12 === 0) : data;
+  const rows  = currentView === 'annual' ? data.filter(r => r.month % 12 === 0) : data;
   const tbody = document.getElementById('projTable');
   tbody.innerHTML = rows.map(r => {
-    const cfCls   = r.cashFlow        < 0 ? 'neg' : 'pos';
-    const capCls  = r.capitalRequired < 0 ? 'neg' : 'pos';
+    const cfCls  = r.cashFlow        < 0 ? 'neg' : 'pos';
+    const capCls = r.capitalRequired < 0 ? 'neg' : 'pos';
     const lotBadge = r.newReconLot ? '<span class="store-badge">Recon+Svc+Sales</span>'
                    : r.newSalesLot ? '<span class="store-badge">Sales</span>' : '';
     const balBadge = r.isOverride  ? `<span class="bal-badge">Override</span>` : '';
@@ -930,6 +929,7 @@ function renderTable(data) {
       <td>$${fmtK(r.downPmtCash)}</td>
       <td>$${fmtK(r.principal)}</td>
       <td>$${fmtK(r.interest)}</td>
+      <td>$${fmtK(r.cppSc)}</td>
       <td>($${fmtK(r.inventoryBuys)})</td>
       <td>($${fmtK(r.salesTax)})</td>
       <td>($${fmtK(r.interestExp)})</td>
@@ -985,9 +985,9 @@ function resetDefaults() {
     stores:17, initAR:189000000, initAccounts:14721, initBalance:12800, balDecline:50, balFloor:12000,
     initLOC:6500000, locRate:7.0,
     salesPerLoc:50.6, downPmt:1250, amtFinanced:16000, acv:9500,
-    coRate:4.0, poRate:0.31, prinRate:4.0, intRate:1.81, netLoss:8596,
+    coRate:4.0, poRate:0.0325, prinRate:3.8, intRate:1.77, cppRate:0.7, netLoss:8596,
     growthInterval:4, startGrowth:3, reconCycle:4, taxRate:7.5,
-    baseOpex:3250000, opexSales:60000, opexRecon:125000, opexService:75000,
+    baseOpex:4250000, opexSales:60000, opexRecon:125000, opexService:75000,
     capexPerStore:500, capexSales:50000, capexRecon:100000, capexService:75000,
     landSales:1000000, landRecon:1250000, landService:800000,
   };

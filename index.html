@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BHPH Growth & Capital Requirements Projector</title>
+<title>BHPH Growth & Capital Requirements Projector v3</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -167,7 +167,7 @@
 
 <header>
   <h1>BHPH <span>Growth & Capital Requirements</span> Projector</h1>
-  <div class="header-badge">60-Month Forecast</div>
+  <div class="header-badge">60-Month Forecast · v3</div>
 </header>
 
 <div class="app-body">
@@ -577,7 +577,7 @@
             <th>Principal</th>
             <th>Interest</th>
             <th>CPP/SC</th>
-            <th>Inventory</th>
+            <th>Inventory (Net)</th>
             <th>Sales Tax</th>
             <th>LOC Int Exp</th>
             <th>CapEx</th>
@@ -639,7 +639,26 @@ function getOverrides() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  MODEL
+//  MODEL  (v3 — bugs fixed vs v2)
+//
+//  BUG-1 FIX · inventoryBuys advance-purchase formula
+//    v2 used: salesUnits × ACV  (only normal monthly stock)
+//    v3 uses: (storeCount + 12·NSL − 6·prevNSL) × salesPerLoc × ACV
+//    where NSL = newSalesLot this month, prevNSL = last month's NSL.
+//    On lot-opening month the model buys 3 months of forward stock for
+//    the new location; the following month that pre-purchase reduces the
+//    outflow.  Net combined formula verified against Excel Baseline sheet.
+//
+//  BUG-2 FIX · interestExp floor at $0
+//    v2: debtBalance × locRate / 12  (goes negative once LOC is repaid)
+//    v3: Math.max(0, debtBalance × locRate / 12)
+//
+//  BUG-3 NOTE · store opening timing
+//    The formula (m − startGrowth) % growthInterval === 0 produces a
+//    strict 4-month cadence: months 3, 7, 11, …, 51, 55, 59.
+//    The reference spreadsheet hardcoded its last two openings at months
+//    56 and 60 (off by 1), which appears to be a data-entry discrepancy.
+//    The formula-driven schedule is mathematically correct and retained.
 // ═══════════════════════════════════════════════════════
 function getParams() {
   const g = id => parseFloat(document.getElementById('n_' + id).value) || 0;
@@ -684,13 +703,14 @@ function runModel(p, balOverrides) {
   const VARIANCE_RATE = 0.0009;
   const results = [];
 
-  let accounts    = p.initAccounts;
-  let avgBalance  = p.initBalance;
-  let ar          = p.initAR;
-  let storeCount  = p.stores;
-  let opex        = p.baseOpex;
-  let newStores   = 0;
-  let debtBalance = p.initLOC;
+  let accounts       = p.initAccounts;
+  let avgBalance     = p.initBalance;
+  let ar             = p.initAR;
+  let storeCount     = p.stores;
+  let opex           = p.baseOpex;
+  let newStores      = 0;
+  let debtBalance    = p.initLOC;
+  let prevNewSalesLot = 0;  // BUG-1 FIX: track prior month's lot-opening flag
 
   for (let m = 1; m <= 60; m++) {
     // ── Store openings ──
@@ -712,7 +732,8 @@ function runModel(p, balOverrides) {
     }
 
     // ── LOC interest expense (on prior month balance) ──
-    const interestExp = debtBalance * (p.locRate / 12);
+    // BUG-2 FIX: floor at $0 — no income when the LOC is fully repaid
+    const interestExp = Math.max(0, debtBalance * (p.locRate / 12));
 
     // ── Sales & account attrition (floating point — not rounded) ──
     const salesUnits = storeCount * p.salesPerLoc;
@@ -738,7 +759,12 @@ function runModel(p, balOverrides) {
     const principal     = prevAR * p.prinRate;
     const interest      = ar * p.intRate;
     const cppSc         = ar * p.cppRate;                     // CPP / SC premium income
-    const inventoryBuys = salesUnits * p.acv;
+    // BUG-1 FIX: advance-purchase inventory formula
+    // Combined spreadsheet formula: (storeCount + 12·NSL − 6·prevNSL) × salesPerLoc × ACV
+    //   Normal months  : storeCount × salesPerLoc × ACV  (unchanged from v2)
+    //   Opening month  : +12 × salesPerLoc × ACV  (3-month forward stock for new lot)
+    //   Month after    :  −6 × salesPerLoc × ACV  (prior-month pre-purchase credit)
+    const inventoryBuys = (storeCount + 12 * newSalesLot - 6 * prevNewSalesLot) * p.salesPerLoc * p.acv;
     const salesTax      = prevAR * p.prinRate * p.taxRate;    // prevAR × prinRate × taxRate
     const capex         = storeCount * p.capexPerStore + locCapex;
     const chargeOff     = coCount * p.netLoss;                // informational
@@ -766,6 +792,9 @@ function runModel(p, balOverrides) {
       hasNewLot: newSalesLot + newReconLot > 0,
       newReconLot, newSalesLot, isOverride,
     });
+
+    // BUG-1 FIX: carry forward this month's lot flag for next iteration
+    prevNewSalesLot = newSalesLot;
   }
   return results;
 }
